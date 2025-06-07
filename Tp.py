@@ -39,12 +39,42 @@ def optimizado(A, b):
     """Resolución de un sistema de ecuaciones lineales optimizado
         cuando la matriz A es tridiagonal.
     """
-    x = np.zeros_like(b)
+    n = len(A)
+
+    for k in range(n - 1):
+        factor = A[k + 1][k] / A[k][k]
+        for j in range(k, k + 2):  # Solo afecta columnas k y k+1
+            A[k + 1][j] -= factor * A[k][j]
+        b[k + 1] -= factor * b[k]
+
+    x = [0] * n
+    x[-1] = b[-1] / A[-1][-1]
+    for i in range(n - 2, -1, -1):
+        x[i] = (b[i] - A[i][i + 1] * x[i + 1]) / A[i][i]
+
     return x
 
 def gauss_pivoteo(A, b):
-    """Método de Gauss con pivoteo parcial"""
-    x = np.zeros_like(b)
+    n = len(A)
+
+    for k in range(n - 1):
+        if abs(A[k+1][k]) > abs(A[k][k]):
+
+            A[k], A[k+1] = A[k+1], A[k]
+
+            b[k], b[k+1] = b[k+1], b[k]
+
+        factor = A[k+1][k] / A[k][k]
+        for j in range(k, k+2):
+            A[k+1][j] -= factor * A[k][j]
+        b[k+1] -= factor * b[k]
+
+
+    x = [0] * n
+    x[-1] = b[-1] / A[-1][-1]
+    for i in range(n - 2, -1, -1):
+        x[i] = (b[i] - A[i][i+1] * x[i+1]) / A[i][i]
+
     return x
 
 # Un paso de simulación con el método implícito y método de solución

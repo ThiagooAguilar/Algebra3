@@ -39,41 +39,65 @@ def optimizado(A, b):
     """Resolución de un sistema de ecuaciones lineales optimizado
         cuando la matriz A es tridiagonal.
     """
-    n = len(A)
+    A = A.toarray()  
+    n = A.shape[0]   
+    A_copy = np.copy(A)
+    b_copy = np.copy(b)
 
-    for k in range(n - 1):
-        factor = A[k + 1][k] / A[k][k]
-        for j in range(k, k + 2):  # Solo afecta columnas k y k+1
-            A[k + 1][j] -= factor * A[k][j]
-        b[k + 1] -= factor * b[k]
+    for k in range(n-1): 
+        factor = A_copy[k+1][k] / A_copy[k][k] 
+        A_copy[k+1][k] = 0 # La subdiagonal -> a = 0 siempre
+        A_copy[k+1][k+1] -= factor * A_copy[k][k+1]
+        # La superdiagonal(c) queda igual
+        b_copy[k+1] -= factor * b_copy[k]
 
-    x = [0] * n
-    x[-1] = b[-1] / A[-1][-1]
+    x = np.zeros(n)
+    x[-1] = b_copy[-1] / A_copy[-1][-1]
     for i in range(n - 2, -1, -1):
-        x[i] = (b[i] - A[i][i + 1] * x[i + 1]) / A[i][i]
+        x[i] = (b_copy[i] - A_copy[i][i + 1] * x[i + 1]) / A_copy[i][i]
 
     return x
+def es_tridiagonal(A):
+    A = np.asarray(A)
+    n, m = A.shape
+    if n != m:
+        return False  # No es cuadrada
+    for i in range(n):
+        for j in range(n):
+            if abs(i - j) > 1 and abs(A[i, j]) > 0:
+                return False
+    return True
 
 def gauss_pivoteo(A, b):
-    n = len(A)
-
+    A = A.toarray()
+    n = A.shape[0]
+    A_copy = np.copy(A)
+    b_copy = np.copy(b)
+    
     for k in range(n - 1):
-        if abs(A[k+1][k]) > abs(A[k][k]):
+        max_i = k
+        for i in range(k+1, n):
+            if abs(A_copy[i][k]) > abs(A_copy[max_i][k]):
+                max_i = i
+        if max_i != k:
+            A_copy[[k, max_i]] = A_copy[[max_i, k]]
+            b_copy[k], b_copy[max_i] = b_copy[max_i], b_copy[k]
+        for j in range(k+1, n):
+            A_copy[k][j] /= A_copy[k][k]
+        b_copy[k] /= A_copy[k][k]
+        A_copy[k][k] = 1
+        for i in range(k+1, n):
+            factor = A_copy[i][k]
+            for j in range(k+1, n):
+                A_copy[i][j] -= factor * A_copy[k][j]
+            b_copy[i] -= factor * b_copy[k]
+            A_copy[i][k] = 0
 
-            A[k], A[k+1] = A[k+1], A[k]
-
-            b[k], b[k+1] = b[k+1], b[k]
-
-        factor = A[k+1][k] / A[k][k]
-        for j in range(k, k+2):
-            A[k+1][j] -= factor * A[k][j]
-        b[k+1] -= factor * b[k]
-
-
-    x = [0] * n
-    x[-1] = b[-1] / A[-1][-1]
+    x = np.zeros(n)
+    x[-1] = b_copy[-1] / A_copy[-1][-1]
     for i in range(n - 2, -1, -1):
-        x[i] = (b[i] - A[i][i+1] * x[i+1]) / A[i][i]
+        sumatoria = np.dot(A_copy[i][i+1:], x[i+1:])
+        x[i] = (b_copy[i] - sumatoria) / A_copy[i][i]
 
     return x
 

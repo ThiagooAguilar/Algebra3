@@ -69,35 +69,35 @@ def es_tridiagonal(A):
     return True
 
 def gauss_pivoteo(A, b):
-    A = A.toarray()
-    n = A.shape[0]
-    A_copy = np.copy(A)
-    b_copy = np.copy(b)
-    
-    for k in range(n - 1):
-        max_i = k
-        for i in range(k+1, n):
-            if abs(A_copy[i][k]) > abs(A_copy[max_i][k]):
-                max_i = i
-        if max_i != k:
-            A_copy[[k, max_i]] = A_copy[[max_i, k]]
-            b_copy[k], b_copy[max_i] = b_copy[max_i], b_copy[k]
-        for j in range(k+1, n):
-            A_copy[k][j] /= A_copy[k][k]
-        b_copy[k] /= A_copy[k][k]
-        A_copy[k][k] = 1
-        for i in range(k+1, n):
-            factor = A_copy[i][k]
-            for j in range(k+1, n):
-                A_copy[i][j] -= factor * A_copy[k][j]
-            b_copy[i] -= factor * b_copy[k]
-            A_copy[i][k] = 0
+    # Convertimos A a densa solo si no lo es
+    if not isinstance(A, np.ndarray):
+        AA = A.toarray()
+    else:
+        AA = A.copy()
+    bb = b.copy()
+    n = AA.shape[0]
 
-    x = np.zeros(n)
-    x[-1] = b_copy[-1] / A_copy[-1][-1]
+    for k in range(n - 1):
+
+        max_i = np.argmax(np.abs(AA[k:n, k])) + k # Busca el pivote con mayor modulo
+        if max_i != k:
+            AA[[k, max_i]] = AA[[max_i, k]]
+            bb[k], bb[max_i] = bb[max_i], bb[k]
+
+        AA[k, k + 1: ] /= AA[k, k] # Normaliza la diagonal a unos
+        bb[k] /= AA[k, k]
+        AA[k, k] = 1.0
+
+        for i in range(k + 1, n): # Genera ceros
+            factor = AA[i, k]
+            AA[i, k + 1:] -= factor * AA[k, k + 1:]
+            bb[i] -= factor * bb[k]
+            AA[i, k] = 0.0
+
+    x = np.zeros(n) # Sustitución hacia atrás
+    x[-1] = bb[-1] / AA[-1, -1]
     for i in range(n - 2, -1, -1):
-        sumatoria = np.dot(A_copy[i][i+1:], x[i+1:])
-        x[i] = (b_copy[i] - sumatoria) / A_copy[i][i]
+        x[i] = (bb[i] - np.dot(AA[i, i + 1:], x[i + 1:])) / AA[i, i]
 
     return x
 
@@ -149,10 +149,101 @@ def error_rms(T_ref, T):
 
 # --------- Experimentos ---------
 
-resoluciones = [20, 30, 50, 70, 100, 500, 1000]
 dt = 0.1
 alpha = 0.01
 pasos = 10
+resoluciones = [10, 20, 30, 50]
 metodos = ['directo', 'optimizado', 'gauss_pivoteo']
 
-# TODO: correr experimientos, obtener resultados y compararlos
+# --- Para almacenar resultados ---
+tiempos = {m: [] for m in metodos}
+errores = {m: [] for m in metodos if m != 'directo'}
+tam_sistema = [((n - 2) ** 2)-9 for n in resoluciones]
+
+print("=== CORRIENDO EXPERIMENTOS ===")
+for res in resoluciones:
+    print(f"\nResolución: {res}x{res} → sistema de {((res - 2) ** 2) - 9} incógnitas")
+
+    # Método de referencia
+    T_ref, t_directo = simular(res, res, dt, alpha, pasos, 'directo')
+    tiempos['directo'].append(t_directo)
+    print(f"  directo         → tiempo = {t_directo:.4f} s")
+
+    for metodo in ['optimizado', 'gauss_pivoteo']:
+        try:
+            T_metodo, t_metodo = simular(res, res, dt, alpha, pasos, metodo)
+            err = error_rms(T_ref, T_metodo)
+            tiempos[metodo].append(t_metodo)
+            errores[metodo].append(err)
+            print(f"  {metodo:15} → tiempo = {t_metodo:.4f} s | error RMS = {err:.2e}")
+        except Exception as e:
+            print(f"  {metodo:15} → ERROR: {e}")
+            tiempos[metodo].append(None)
+            errores[metodo].append(None)
+
+# --- Gráfico: Tiempo promedio vs Tamaño del sistema ---
+plt.figure(figsize=(8, 5))
+for metodo in metodos:
+    plt.plot(tam_sistema, tiempos[metodo], marker='o', label=metodo)
+plt.xlabel("Tamaño del sistema (N = ((n - 2)^2) - 9)")
+plt.ylabel("Tiempo promedio por paso (s)")
+plt.title("Tiempo vs Tamaño del sistema")
+plt.grid()
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# --- Gráfico: Error RMS vs Tamaño del sistema ---
+plt.figure(figsize=(8, 5))
+for metodo in errores:
+    plt.plot(tam_sistema, errores[metodo], marker='o', label=metodo)
+plt.xlabel("Tamaño del sistema (N = ((n - 2)^2) - 9)")
+plt.ylabel("Error RMS relativo")
+plt.title("Error numérico vs Tamaño del sistema")
+plt.grid()
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# --- Gráfico solo del error de Gauss vs Directo ---
+errores_gauss = errores['gauss_pivoteo']
+
+plt.figure(figsize=(8, 5))
+plt.plot(tam_sistema, errores_gauss, marker='o', color='darkgreen', label='gauss_pivoteo')
+plt.xlabel("Tamaño del sistema (N = (res - 2)^2 - 9)")
+plt.ylabel("Error RMS relativo")
+plt.title("Error numérico de gauss_pivoteo vs método directo")
+plt.grid()
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+# --- Visual de las temperaturas ---
+resoluciones = [(10,10),(20,20),(30,30),(50,50)]
+pasos = [1, 5, 10]
+for nx, ny in resoluciones:
+    dx = 1.0 / (nx - 1)
+    dy = 1.0 / (ny - 1)
+    A = construir_matriz(nx, ny, dx, dy, dt, alpha)
+
+    for metodo in metodos:
+        T = inicializar_T(nx, ny)
+        T_actual = T.copy()
+
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+        for paso in range(1, max(pasos) + 1):
+            if paso != 0:
+                T_actual = paso_simulacion(T_actual, A, nx, ny, dx, dy, dt, alpha, metodo)
+            if paso in pasos:
+                idx = pasos.index(paso)
+                im = axes[idx].imshow(T_actual, cmap='hot', origin='lower')
+                axes[idx].set_title(f"Paso {paso}")
+                axes[idx].set_xlabel("x")
+                axes[idx].set_ylabel("y")
+                plt.colorbar(im, ax=axes[idx], fraction=0.046, pad=0.04)
+
+        plt.suptitle(f"Evolución térmica - {nx}x{ny} - Método: {metodo}")
+        plt.tight_layout()
+        plt.show()

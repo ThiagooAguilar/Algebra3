@@ -39,13 +39,13 @@ def optimizado(A, b):
     """Resolución de un sistema de ecuaciones lineales optimizado
         cuando la matriz A es tridiagonal.
     """
-    A = A.toarray()
-    n = A.shape[0]
+    A = A.toarray()  
+    n = A.shape[0]   
     A_copy = np.copy(A)
     b_copy = np.copy(b)
 
-    for k in range(n-1):
-        factor = A_copy[k+1][k] / A_copy[k][k]
+    for k in range(n-1): 
+        factor = A_copy[k+1][k] / A_copy[k][k] 
         A_copy[k+1][k] = 0 # La subdiagonal -> a = 0 siempre
         A_copy[k+1][k+1] -= factor * A_copy[k][k+1]
         # La superdiagonal(c) queda igual
@@ -152,7 +152,7 @@ def error_rms(T_ref, T):
 dt = 0.1
 alpha = 0.01
 pasos = 10
-resoluciones = [10, 20, 30, 50]
+resoluciones = [10, 20, 30, 50, 70]
 metodos = ['directo', 'optimizado', 'gauss_pivoteo']
 
 # --- Para almacenar resultados ---
@@ -220,7 +220,7 @@ plt.show()
 
 
 # --- Visual de las temperaturas ---
-resoluciones = [(10,10),(20,20),(30,30),(50,50)]
+resoluciones = [(10,10),(20,20),(30,30),(50,50), (70,70)]
 pasos = [1, 5, 10]
 for nx, ny in resoluciones:
     dx = 1.0 / (nx - 1)
@@ -247,3 +247,61 @@ for nx, ny in resoluciones:
         plt.suptitle(f"Evolución térmica - {nx}x{ny} - Método: {metodo}")
         plt.tight_layout()
         plt.show()
+
+# --- Gráfico: Crecimiento del error con gauss_pivoteo (30x30) ---
+nx, ny = 30, 30
+dx = 1.0 / (nx - 1)
+dy = 1.0 / (ny - 1)
+A = construir_matriz(nx, ny, dx, dy, dt, alpha)
+
+T_ref = inicializar_T(nx, ny)
+T_gauss = T_ref.copy()
+
+errores_por_paso = []
+num_pasos = 20
+
+for paso in range(num_pasos):
+    T_ref = paso_simulacion(T_ref, A, nx, ny, dx, dy, dt, alpha, 'directo')
+    T_gauss = paso_simulacion(T_gauss, A, nx, ny, dx, dy, dt, alpha, 'gauss_pivoteo')
+
+    err = error_rms(T_ref, T_gauss)
+    errores_por_paso.append(err)
+
+# Graficar evolución del error
+plt.figure(figsize=(8, 5))
+plt.plot(range(1, num_pasos + 1), errores_por_paso, marker='o', color='crimson')
+plt.xlabel("Número de paso")
+plt.ylabel("Error RMS relativo")
+plt.title("Crecimiento del error con gauss_pivoteo (30x30)")
+plt.grid()
+plt.tight_layout()
+plt.show()
+
+# --- Gráfico: Crecimiento del error con metodo optimizado (10x10) ---
+nx, ny = 10, 10
+dx = 1.0 / (nx - 1)
+dy = 1.0 / (ny - 1)
+A = construir_matriz(nx, ny, dx, dy, dt, alpha)
+
+T_ref = inicializar_T(nx, ny)
+T_opt = T_ref.copy()
+
+errores_por_paso = []
+num_pasos = 20
+
+for paso in range(num_pasos):
+    T_ref = paso_simulacion(T_ref, A, nx, ny, dx, dy, dt, alpha, 'directo')
+    T_opt = paso_simulacion(T_opt, A, nx, ny, dx, dy, dt, alpha, 'optimizado')
+
+    err = error_rms(T_ref, T_opt)
+    errores_por_paso.append(err)
+
+# Graficar evolución del error
+plt.figure(figsize=(8, 5))
+plt.plot(range(1, num_pasos + 1), errores_por_paso, marker='o', color='crimson')
+plt.xlabel("Número de paso")
+plt.ylabel("Error RMS relativo")
+plt.title("Crecimiento del error con metodo optimizado (10x10)")
+plt.grid()
+plt.tight_layout()
+plt.show()
